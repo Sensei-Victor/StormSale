@@ -28,6 +28,37 @@ interface ClaimableSale {
   clearingPeriod: number;
 }
 
+// Mock data for the demo dashboard; anchored to a single load-time timestamp.
+const MOCK_NOW = Date.now() / 1000;
+
+const mockClaimableSales: ClaimableSale[] = [
+  {
+    id: 1,
+    campaignAddress: "CA7QW5KXGPTR4N2K9J2...",
+    saleAmount: "100.0",
+    commissionAmount: "10.0",
+    timestamp: MOCK_NOW - 1209600,
+    clearingPeriod: 604800,
+  },
+  {
+    id: 2,
+    campaignAddress: "CB4RN8XJLP8M1K3V6P7...",
+    saleAmount: "250.0",
+    commissionAmount: "25.0",
+    timestamp: MOCK_NOW - 864000,
+    clearingPeriod: 604800,
+  },
+];
+
+const isSaleClaimable = (sale: ClaimableSale) => MOCK_NOW >= sale.timestamp + sale.clearingPeriod;
+
+const getTimeRemaining = (sale: ClaimableSale) => {
+  const remaining = sale.timestamp + sale.clearingPeriod - MOCK_NOW;
+  if (remaining <= 0) return "Ready to claim";
+  const days = Math.ceil(remaining / 86400);
+  return `${days} day${days !== 1 ? "s" : ""} remaining`;
+};
+
 export const ClaimPayouts = () => {
   const { claimPayoutOnChain } = useWeb3();
   const { showNotification } = useNotification();
@@ -59,37 +90,7 @@ export const ClaimPayouts = () => {
     }
   };
 
-  const mockClaimableSales: ClaimableSale[] = [
-    {
-      id: 1,
-      campaignAddress: "CA7QW5KXGPTR4N2K9J2...",
-      saleAmount: "100.0",
-      commissionAmount: "10.0",
-      timestamp: Date.now() / 1000 - 1209600,
-      clearingPeriod: 604800,
-    },
-    {
-      id: 2,
-      campaignAddress: "CB4RN8XJLP8M1K3V6P7...",
-      saleAmount: "250.0",
-      commissionAmount: "25.0",
-      timestamp: Date.now() / 1000 - 864000,
-      clearingPeriod: 604800,
-    },
-  ];
-
-  const isSaleClaimable = (sale: ClaimableSale) => {
-    return Date.now() / 1000 >= sale.timestamp + sale.clearingPeriod;
-  };
-
   const formatTimestamp = (timestamp: number) => new Date(timestamp * 1000).toLocaleDateString();
-
-  const getTimeRemaining = (sale: ClaimableSale) => {
-    const remaining = sale.timestamp + sale.clearingPeriod - Date.now() / 1000;
-    if (remaining <= 0) return "Ready to claim";
-    const days = Math.ceil(remaining / 86400);
-    return `${days} day${days !== 1 ? "s" : ""} remaining`;
-  };
 
   return (
     <div className="space-y-6">
