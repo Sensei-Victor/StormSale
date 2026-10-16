@@ -85,7 +85,8 @@ export const LogSaleForm = () => {
 
       // Automated Conversion Postback Dispatch
       try {
-        const postbackTxHash = tx?.hash || tx?.id || "PENDING_CONFIRMED_LEDGER_TX";
+        const txMeta = tx as { hash?: string; id?: string };
+        const postbackTxHash = txMeta.hash || txMeta.id || "PENDING_CONFIRMED_LEDGER_TX";
 
         const postbacks = await triggerConversionPostback({
           saleId: payload.saleId,

@@ -25,26 +25,6 @@ import {
 } from "../../lib/batchClaim";
 import { motion, AnimatePresence } from "framer-motion";
 
-const nowInSeconds = Date.now() / 1000;
-const mockClaimableSales: ClaimableSale[] = [
-  {
-    id: 1,
-    campaignAddress: "CA7QW5KXGPTR4N2K9J2...",
-    saleAmount: "100.0",
-    commissionAmount: "10.0",
-    timestamp: nowInSeconds - 1209600,
-    clearingPeriod: 604800,
-  },
-  {
-    id: 2,
-    campaignAddress: "CB4RN8XJLP8M1K3V6P7...",
-    saleAmount: "250.0",
-    commissionAmount: "25.0",
-    timestamp: nowInSeconds - 864000,
-    clearingPeriod: 604800,
-  },
-];
-
 export const ClaimPayouts = () => {
   const { userAddress, batchClaimPayoutsOnChain, claimPayoutOnChain } = useWeb3();
   const { showNotification } = useNotification();
@@ -110,12 +90,12 @@ export const ClaimPayouts = () => {
         title: "Batch Commission Claim Settled!",
         message: `Claimed ${resultReceipt.totalClaimedXlm} XLM across ${resultReceipt.itemizedClaims.length} campaigns in 1 transaction.`,
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Batch claim failure:", err);
       showNotification({
         type: "error",
         title: "Batch Claim Failed",
-        message: err.message || "Failed to execute batch claim transaction.",
+        message: err instanceof Error ? err.message : "Failed to execute batch claim transaction.",
       });
     } finally {
       setIsBatchClaiming(false);
