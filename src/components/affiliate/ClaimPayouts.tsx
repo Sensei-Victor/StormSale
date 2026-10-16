@@ -25,6 +25,26 @@ import {
 } from "../../lib/batchClaim";
 import { motion, AnimatePresence } from "framer-motion";
 
+const nowInSeconds = Date.now() / 1000;
+const mockClaimableSales: ClaimableSale[] = [
+  {
+    id: 1,
+    campaignAddress: "CA7QW5KXGPTR4N2K9J2...",
+    saleAmount: "100.0",
+    commissionAmount: "10.0",
+    timestamp: nowInSeconds - 1209600,
+    clearingPeriod: 604800,
+  },
+  {
+    id: 2,
+    campaignAddress: "CB4RN8XJLP8M1K3V6P7...",
+    saleAmount: "250.0",
+    commissionAmount: "25.0",
+    timestamp: nowInSeconds - 864000,
+    clearingPeriod: 604800,
+  },
+];
+
 export const ClaimPayouts = () => {
   const { userAddress, batchClaimPayoutsOnChain, claimPayoutOnChain } = useWeb3();
   const { showNotification } = useNotification();
@@ -121,11 +141,11 @@ export const ClaimPayouts = () => {
         title: "Commission Paid Out!",
         message: `Settled on Stellar ledger. Tx: ${res.txHash ? res.txHash.slice(0, 10) + "..." : "Confirmed"}`,
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       showNotification({
         type: "error",
         title: "Claim Failed",
-        message: err.message || "Failed to claim commission.",
+        message: err instanceof Error ? err.message : "Failed to claim commission.",
       });
     } finally {
       setClaimingId(null);
