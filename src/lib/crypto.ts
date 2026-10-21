@@ -1,70 +1,96 @@
+/**
+ * Secure Affiliate Sale Payload Crypto (Issue #49)
+ * Real AES-GCM-256 envelope encryption via WebCrypto (`crypto.subtle`).
+ * Envelope: base64(JSON { v:1, alg:"AES-GCM-256", iv:b64(12B), data:b64(ct) })
+ */
+
 const saleKeyStore = new Map<string, CryptoKey>();
 
-export async function generateAESKey(): Promise<CryptoKey> {
-  if (typeof crypto !== "undefined" && crypto.subtle) {
-    try {
-      return await crypto.subtle.generateKey(
-        {
-          name: "AES-GCM",
-          length: 256,
-        },
-        true,
-        ["encrypt", "decrypt", "wrapKey", "unwrapKey"],
-      );
-    } catch (e) {
-      console.warn("SubtleCrypto generateKey failed, returning fallback key", e);
-    }
+const TEXT_ENCODER = new TextEncoder();
+const TEXT_DECODER = new TextDecoder();
+const ENVELOPE_VERSION = 1;
+const GCM_IV_BYTES = 12;
+const MAX_PLAINTEXT_BYTES = 64 * 1024;
+const MAX_ENVELOPE_CHARS = 200_000;
+
+interface SecureEnvelope {
+  v: number;
+  alg: string;
+  iv: string;
+  data: string;
+}
+
+function getSubtle(): SubtleCrypto {
+  const subtle =
+    globalThis.crypto?.subtle ??
+    (globalThis as unknown as { webcrypto?: Crypto }).webcrypto?.subtle;
+
+  if (!subtle) {
+    throw new Error("WebCrypto SubtleCrypto is unavailable in this environment.");
   }
-  return {} as CryptoKey;
+
+  return subtle;
 }
 
-/**
- * Retrieves or generates an AES encryption key for a given saleId.
- */
-export async function getSaleEncryptionKey(saleId: string): Promise<CryptoKey> {
-  const existing = saleKeyStore.get(saleId);
-  if (existing) {
-    return existing;
+function base64Encode(bytes: Uint8Array): string {
+  let binary = "";
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
   }
-  const newKey = await generateAESKey();
-  saleKeyStore.set(saleId, newKey);
-  return newKey;
+  return btoa(binary);
 }
 
-export function storeSaleEncryptionKey(saleId: string, key: CryptoKey): void {
-  saleKeyStore.set(saleId, key);
+function base64Decode(input: string): Uint8Array<ArrayBuffer> {
+  if (!input || typeof input !== "string") {
+    throw new Error("Invalid encrypted payload: malformed envelope.");
+  }
+
+  if (!/^[A-Za-z0-9+/=_-]+$/.test(input)) {
+    throw new Error("Invalid encrypted payload: malformed envelope.");
+  }
+
+  const normalized = input.replace(/-/g, "+").replace(/_/g, "/");
+  let binary: string;
+
+  try {
+    binary = atob(normalized);
+  } catch {
+    throw new Error("Invalid encrypted payload: malformed envelope.");
+  }
+
+  const bytes = new Uint8Array(new ArrayBuffer(binary.length));
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+
+  return bytes;
 }
 
-export async function encryptPayload(payload: object, _aesKey: CryptoKey): Promise<string> {
-  // Placeholder
-  console.log("Stub: Encrypting payload...", payload);
-  return "STUB_ENCRYPTED_PAYLOAD";
+function randomBytes(length: number): Uint8Array<ArrayBuffer> {
+  const bytes = new Uint8Array(new ArrayBuffer(length));
+  const cryptoProvider =
+    globalThis.crypto ??
+    (globalThis as unknown as { webcrypto?: Crypto }).webcrypto;
+
+  if (cryptoProvider?.getRandomValues) {
+    cryptoProvider.getRandomValues(bytes);
+    return bytes;
+  }
+
+  throw new Error("Secure random number generator is unavailable.");
 }
 
-export async function wrapAESKey(_aesKey: CryptoKey, publicKey: string): Promise<string> {
-  console.log("Wrapping AES key for public key:", publicKey);
-  return `WRAPPED_KEY_${publicKey}`;
+function assertAesGcmKey(key: unknown): asserts key is CryptoKey {
+  const candidate = key as CryptoKey | null;
+
+  if (
+    !candidate ||
+    typeof candidate !== "object" ||
+    (candidate.algorithm as Algorithm | undefined)?.name?.toUpperCase() !== "AES-GCM"
+  ) {
+    throw new Error("Decryption failed: invalid key.");
+  }
 }
 
-export async function unwrapAESKey(_wrappedKey: string, _privateKey: string): Promise<CryptoKey> {
-  // Placeholder
-  console.log("Stub: Unwrapping AES key...");
-  return {} as CryptoKey;
-}
-
-export async function decryptPayload(
-  _encryptedPayload: string,
-  _aesKey: CryptoKey,
-): Promise<object> {
-  // Placeholder
-  console.log("Stub: Decrypting payload...");
-  return { decrypted_message: "This is stub data" };
-}
-
-// Helper to get a "mock" public key from a wallet address
-export async function getPublicKeyForAddress(address: string): Promise<string> {
-  // In a real app, this might come from a different contract,
-  // a signature-based lookup, or MetaMask's encryption methods.
-  console.log("Stub: Fetching public key for address:", address);
-  return `MOCK_PUBLIC_KEY_FOR_${address}`;
-}
+async function deriveWrappingKey(identifier: string): Promise<CryptoKey> {
+  if (!identifier || typeof identifier !== "string" || identifier.trim().length === 0) {
