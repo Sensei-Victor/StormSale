@@ -59,12 +59,14 @@ export const CreateCampaignForm = () => {
       setClearingPeriod("");
       setCampaignName("");
       setBudget("");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error creating campaign:", error);
+      const errorMessage =
+        error instanceof Error ? error.message : typeof error === "string" ? error : "Failed to create campaign";
       showNotification({
         type: "error",
         title: "Creation Failed",
-        message: error.message || "Failed to create campaign",
+        message: errorMessage,
       });
     } finally {
       setIsLoading(false);

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from "react";
+import React, { createContext, useContext, useState, useRef, useEffect } from "react";
 import type { ReactNode } from "react";
 import { useWeb3 } from "./Web3Context";
 
@@ -34,28 +34,39 @@ export const WalletConnectProvider: React.FC<WalletConnectProviderProps> = ({ ch
   const { connectWallet, disconnectWallet, switchToStellarNetwork, isConnected, isStellarNetwork } =
     useWeb3();
 
+  const disconnectSessionRef = useRef(0);
+
+  // Reactively trigger network modal when wallet is connected but on incorrect network
+  useEffect(() => {
+    if (isConnected && !isStellarNetwork) {
+      setState((prev) => ({ ...prev, showNetworkModal: true }));
+    } else if (isStellarNetwork) {
+      setState((prev) => ({ ...prev, showNetworkModal: false }));
+    }
+  }, [isConnected, isStellarNetwork]);
+
   const connect = async (): Promise<void> => {
+    const currentSession = ++disconnectSessionRef.current;
     setState((prev) => ({ ...prev, isConnecting: true, error: null }));
 
     try {
       await connectWallet();
-
-      // Check if we're on Stellar network after connection
-      if (isConnected && !isStellarNetwork) {
-        setState((prev) => ({ ...prev, showNetworkModal: true }));
-      }
     } catch (error: any) {
+      if (disconnectSessionRef.current !== currentSession) return;
       console.error("Wallet connection error:", error);
       setState((prev) => ({
         ...prev,
         error: error.message || "Failed to connect wallet",
       }));
     } finally {
-      setState((prev) => ({ ...prev, isConnecting: false }));
+      if (disconnectSessionRef.current === currentSession) {
+        setState((prev) => ({ ...prev, isConnecting: false }));
+      }
     }
   };
 
   const disconnect = (): void => {
+    disconnectSessionRef.current++;
     disconnectWallet();
     setState({
       isConnecting: false,

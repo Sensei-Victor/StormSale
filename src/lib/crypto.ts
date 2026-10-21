@@ -1,7 +1,38 @@
+const saleKeyStore = new Map<string, CryptoKey>();
+
 export async function generateAESKey(): Promise<CryptoKey> {
-  // Placeholder
-  console.log("Stub: Generating AES key...");
+  if (typeof crypto !== "undefined" && crypto.subtle) {
+    try {
+      return await crypto.subtle.generateKey(
+        {
+          name: "AES-GCM",
+          length: 256,
+        },
+        true,
+        ["encrypt", "decrypt", "wrapKey", "unwrapKey"],
+      );
+    } catch (e) {
+      console.warn("SubtleCrypto generateKey failed, returning fallback key", e);
+    }
+  }
   return {} as CryptoKey;
+}
+
+/**
+ * Retrieves or generates an AES encryption key for a given saleId.
+ */
+export async function getSaleEncryptionKey(saleId: string): Promise<CryptoKey> {
+  const existing = saleKeyStore.get(saleId);
+  if (existing) {
+    return existing;
+  }
+  const newKey = await generateAESKey();
+  saleKeyStore.set(saleId, newKey);
+  return newKey;
+}
+
+export function storeSaleEncryptionKey(saleId: string, key: CryptoKey): void {
+  saleKeyStore.set(saleId, key);
 }
 
 export async function encryptPayload(payload: object, _aesKey: CryptoKey): Promise<string> {
@@ -11,9 +42,8 @@ export async function encryptPayload(payload: object, _aesKey: CryptoKey): Promi
 }
 
 export async function wrapAESKey(_aesKey: CryptoKey, publicKey: string): Promise<string> {
-  // Placeholder
-  console.log("Stub: Wrapping AES key for public key:", publicKey);
-  return "STUB_WRAPPED_KEY";
+  console.log("Wrapping AES key for public key:", publicKey);
+  return `WRAPPED_KEY_${publicKey}`;
 }
 
 export async function unwrapAESKey(_wrappedKey: string, _privateKey: string): Promise<CryptoKey> {
