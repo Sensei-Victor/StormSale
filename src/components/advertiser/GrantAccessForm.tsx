@@ -11,7 +11,8 @@ import {
 } from "../../components/ui/card";
 import { useWeb3 } from "../../hooks/useWeb3";
 import { useNotification } from "../../context/NotificationContext";
-import { wrapAESKey, getPublicKeyForAddress } from "../../lib/crypto";
+import { wrapAESKey, getPublicKeyForAddress, getSaleEncryptionKey } from "../../lib/crypto";
+import { grantAccessSchema, getFieldErrors } from "../../lib/validation";
 import { Eye, Shield, UserCheck } from "lucide-react";
 
 export const GrantAccessForm = () => {
@@ -19,23 +20,29 @@ export const GrantAccessForm = () => {
   const [auditorAddress, setAuditorAddress] = useState("");
   const [campaignAddress, setCampaignAddress] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
   const { getCampaignContract } = useWeb3();
   const { showNotification } = useNotification();
 
+  const clearError = (field: string) =>
+    setErrors((prev) => ({ ...prev, [field]: "" }));
+
   const handleGrantAccess = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!saleId || !auditorAddress || !campaignAddress) {
-      showNotification({
-        type: "warning",
-        title: "Missing Information",
-        message: "Please fill all required fields",
-      });
+    setErrors({});
+
+    const result = grantAccessSchema.safeParse({ campaignAddress, saleId, auditorAddress });
+
+    if (!result.success) {
+      setErrors(getFieldErrors(result.error));
       return;
     }
 
+    const { data } = result;
     setIsLoading(true);
     try {
-      const campaignContract = getCampaignContract(campaignAddress);
+      const campaignContract = getCampaignContract(data.campaignAddress);
 
       showNotification({
         type: "info",
@@ -43,8 +50,9 @@ export const GrantAccessForm = () => {
         message: "Setting up auditor permissions...",
       });
 
-      const auditorPublicKey = await getPublicKeyForAddress(auditorAddress);
-      const auditorWrappedKey = await wrapAESKey({} as CryptoKey, auditorPublicKey);
+      const auditorPublicKey = await getPublicKeyForAddress(data.auditorAddress);
+      const encryptionKey = await getSaleEncryptionKey(data.saleId);
+      const auditorWrappedKey = await wrapAESKey(encryptionKey, auditorPublicKey);
 
       showNotification({
         type: "info",
@@ -52,7 +60,11 @@ export const GrantAccessForm = () => {
         message: "Granting audit access...",
       });
 
-      const tx = await campaignContract.grantAuditAccess(saleId, auditorAddress, auditorWrappedKey);
+      const tx = await campaignContract.grantAuditAccess(
+        data.saleId,
+        data.auditorAddress,
+        auditorWrappedKey,
+      );
 
       await tx.wait();
 
@@ -65,12 +77,12 @@ export const GrantAccessForm = () => {
       setSaleId("");
       setAuditorAddress("");
       setCampaignAddress("");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error granting audit access:", error);
       showNotification({
         type: "error",
         title: "Access Grant Failed",
-        message: error.message || "Failed to grant audit access",
+        message: error instanceof Error ? error.message : "Failed to grant audit access",
       });
     } finally {
       setIsLoading(false);
@@ -106,50 +118,53 @@ export const GrantAccessForm = () => {
         </CardHeader>
 
         <CardContent className="px-8 pb-8">
-          <form onSubmit={handleGrantAccess}>
+          <form onSubmit={handleGrantAccess} noValidate>
             <InputGroup className="space-y-8">
               <InputField
                 label="Campaign Address"
-                description="The campaign containing the sale data"
+                description="Soroban contract address (C…) containing the sale data"
+                error={errors.campaignAddress}
                 required
               >
                 <Input
                   value={campaignAddress}
-                  onChange={(e) => setCampaignAddress(e.target.value)}
-                  placeholder="CCAMPAIGN... (Soroban Contract Address or ID)"
-                  className="h-12 border-slate-200 dark:border-zinc-800 focus:ring-indigo-600 dark:focus:ring-indigo-500 rounded-xl bg-slate-50 dark:bg-zinc-950"
-                  required
+                  onChange={(e) => { setCampaignAddress(e.target.value); clearError("campaignAddress"); }}
+                  placeholder="CCAMPAIGN... (56-char Soroban Contract Address)"
+                  variant={errors.campaignAddress ? "error" : "default"}
+                  className="h-12 border-slate-200 dark:border-zinc-800 focus:ring-indigo-600 dark:focus:ring-indigo-500 rounded-xl bg-slate-50 dark:bg-zinc-950 font-mono"
                 />
               </InputField>
 
               <div className="grid md:grid-cols-2 gap-6">
                 <InputField
                   label="Sale ID"
-                  description="The specific sale to grant access to"
+                  description="Positive integer ledger index of the sale"
+                  error={errors.saleId}
                   required
                 >
                   <Input
                     type="number"
                     min="1"
                     value={saleId}
-                    onChange={(e) => setSaleId(e.target.value)}
+                    onChange={(e) => { setSaleId(e.target.value); clearError("saleId"); }}
                     placeholder="e.g., 123"
+                    variant={errors.saleId ? "error" : "default"}
                     className="h-12 border-slate-200 dark:border-zinc-800 focus:ring-indigo-600 dark:focus:ring-indigo-500 rounded-xl bg-slate-50 dark:bg-zinc-950"
-                    required
                   />
                 </InputField>
 
                 <InputField
                   label="Auditor Address"
-                  description="The auditor's wallet address"
+                  description="Stellar public key of the auditor (G…)"
+                  error={errors.auditorAddress}
                   required
                 >
                   <Input
                     value={auditorAddress}
-                    onChange={(e) => setAuditorAddress(e.target.value)}
-                    placeholder="GAUDITOR... (Stellar Public Key)"
-                    className="h-12 border-slate-200 dark:border-zinc-800 focus:ring-indigo-600 dark:focus:ring-indigo-500 rounded-xl bg-slate-50 dark:bg-zinc-950"
-                    required
+                    onChange={(e) => { setAuditorAddress(e.target.value); clearError("auditorAddress"); }}
+                    placeholder="GAUDITOR... (56-char Stellar Public Key)"
+                    variant={errors.auditorAddress ? "error" : "default"}
+                    className="h-12 border-slate-200 dark:border-zinc-800 focus:ring-indigo-600 dark:focus:ring-indigo-500 rounded-xl bg-slate-50 dark:bg-zinc-950 font-mono"
                   />
                 </InputField>
               </div>
@@ -173,7 +188,8 @@ export const GrantAccessForm = () => {
 
               <Button
                 type="submit"
-                disabled={isLoading}
+                loading={isLoading}
+                cooldown
                 className="w-full h-14 bg-zinc-900 hover:bg-zinc-800 dark:bg-indigo-600 dark:hover:bg-indigo-500 text-white text-lg font-bold shadow-lg rounded-xl transition-all"
               >
                 {isLoading ? (
