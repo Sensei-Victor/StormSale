@@ -11,6 +11,7 @@ import { RpcStatusModal } from "./components/shared/RpcStatusModal";
 import { loadBrandConfig } from "./lib/branding";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import { TooltipProvider } from "./components/ui/tooltip";
+import { ShortLinkRedirect } from "./components/affiliate/ShortLinkRedirect";
 
 // Lazy-loaded routes and role-specific dashboards
 export const Landing = lazy(() => import("./pages/Landing").then((m) => ({ default: m.Landing })));
@@ -192,6 +193,17 @@ function App() {
       cleanup();
     };
   }, []);
+
+  const isShortLinkRoute =
+    typeof window !== "undefined" && window.location.pathname.startsWith("/c/");
+
+  if (isShortLinkRoute) {
+    return (
+      <ErrorBoundary>
+        <ShortLinkRedirect />
+      </ErrorBoundary>
+    );
+  }
 
   return (
     <NotificationWrapper>
