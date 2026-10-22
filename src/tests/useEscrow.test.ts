@@ -1,6 +1,16 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
+
+// src/config/stellar.ts eagerly derives Soroban contract ids at import time, which
+// crashes inside the jsdom realm (dual @stellar/stellar-sdk XDR instances). The hook
+// only needs the Horizon URL, so the module is stubbed for this suite.
+vi.mock("../config/stellar", () => ({
+  STELLAR_CONFIG: {
+    horizonUrl: "https://horizon-testnet.stellar.org",
+  },
+}));
+
 import { useEscrowBalance, fetchAccountBalances } from "../hooks/useEscrow";
 
 describe("useEscrowBalance Hook & Multi-Token Escrow (#71)", () => {

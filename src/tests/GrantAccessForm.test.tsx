@@ -4,6 +4,9 @@ import {
   getSaleEncryptionKey,
   storeSaleEncryptionKey,
   wrapAESKey,
+  unwrapAESKey,
+  encryptPayload,
+  decryptPayload,
   getPublicKeyForAddress,
 } from "../lib/crypto";
 
@@ -42,12 +45,15 @@ describe("GrantAccessForm & Crypto Audit Key Wrapping (#150)", () => {
 
     it("should wrap an AES key using the auditor public key", async () => {
       const key = await generateAESKey();
-      const auditorPubKey = "MOCK_PUBLIC_KEY_FOR_GAUDITOR123";
+      const auditorPubKey = await getPublicKeyForAddress("GAUDITOR1234567890TESTNET");
       const wrapped = await wrapAESKey(key, auditorPubKey);
 
       expect(wrapped).toBeDefined();
-      expect(wrapped).toContain(auditorPubKey);
-      expect(wrapped.startsWith("WRAPPED_KEY_")).toBe(true);
+      expect(wrapped).not.toBe("STUB_WRAPPED_KEY");
+
+      const unwrapped = await unwrapAESKey(wrapped, auditorPubKey);
+      const probe = await encryptPayload({ saleId: 5 }, unwrapped);
+      expect(await decryptPayload(probe, key)).toEqual({ saleId: 5 });
     });
   });
 });
