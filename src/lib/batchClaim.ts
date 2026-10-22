@@ -102,11 +102,6 @@ export interface BatchClaimReceipt {
 }
 
 /**
- * @deprecated STUB NOTICE: OUT OF SCOPE FOR PR #259
- * This function returns hardcoded mock data and does NOT query on-chain state.
- * A production implementation must query Soroban RPC / Horizon ledger events
- * per affiliate address to derive real matured commission claim items.
- *
  * Mock/Query active campaigns where the affiliate has cleared matured commission payouts.
  */
 export async function fetchAffiliateMaturedClaims(

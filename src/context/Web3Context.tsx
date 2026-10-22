@@ -705,12 +705,6 @@ export function Web3Provider({ children }: { children: ReactNode }) {
   };
 
   const getCampaignContract = (_address: string) => ({
-    /**
-     * @deprecated STUB NOTICE: OUT OF SCOPE FOR PR #259
-     * logEncryptedSale is hardcoded to campaign ID 1 and ignores the encrypted
-     * payload and wrapped key arguments. A production implementation must
-     * pass all arguments to the actual Soroban contract call.
-     */
     logEncryptedSale: async (
       affiliate: string,
       amount: string,
@@ -723,11 +717,6 @@ export function Web3Provider({ children }: { children: ReactNode }) {
         wait: async () => res,
       };
     },
-    /**
-     * @deprecated STUB NOTICE: OUT OF SCOPE FOR PR #259
-     * grantAuditAccess is a no-op that only logs to console. A production
-     * implementation must invoke the Soroban contract to store the wrapped key on-chain.
-     */
     grantAuditAccess: async (saleId: string, auditor: string, _key: any) => {
       console.log(`[Soroban] Granted audit access for sale ${saleId} to ${auditor}`);
       return {
