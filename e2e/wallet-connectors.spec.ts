@@ -1,7 +1,13 @@
 import { test, expect, type Page } from "@playwright/test";
+import { mockBackend } from "../tests/e2e/helpers";
 
 const DEMO_PREFIX = "/c/1?ref=GASTORMSALE7";
 
+/**
+ * Connects the 1-Tap Demo Account wallet connector via the modal.
+ *
+ * @param page - Playwright page object
+ */
 const connectDemoWallet = async (page: Page) => {
   await page
     .getByRole("button", { name: /connect wallet/i })
@@ -11,13 +17,20 @@ const connectDemoWallet = async (page: Page) => {
   await expect(page.getByRole("heading", { name: "Select Your Role" })).toBeVisible();
 };
 
+/**
+ * Assumes a role by selecting its card and signing the role confirmation.
+ *
+ * @param page - Playwright page object
+ * @param role - Role title to assume (e.g., 'Advertiser', 'Affiliate')
+ */
 const assumeRole = async (page: Page, role: string) => {
-  await page.getByText(role, { exact: true }).click();
+  await page.getByRole("heading", { name: role, exact: true }).click();
   await page.getByRole("button", { name: /sign & assume role/i }).click();
 };
 
 test.describe("StormSale wallet connector smoke tests", () => {
   test.beforeEach(async ({ page }) => {
+    await mockBackend(page);
     await page.goto("/");
   });
 
@@ -66,6 +79,22 @@ test.describe("StormSale wallet connector smoke tests", () => {
     if (browserName === "chromium") {
       const clipboard = await page.evaluate(() => navigator.clipboard.readText());
       expect(clipboard).toContain(DEMO_PREFIX);
+    } else {
+      // Multi-browser fallback for Firefox and WebKit where clipboard-read permission is restricted
+      await page.evaluate(() => {
+        const input = document.createElement("textarea");
+        input.id = "playwright-clipboard-check";
+        document.body.appendChild(input);
+      });
+      await page.focus("#playwright-clipboard-check");
+      const modifier = process.platform === "darwin" ? "Meta" : "Control";
+      await page.keyboard.press(`${modifier}+v`);
+      const clipboard = await page.inputValue("#playwright-clipboard-check");
+      await page.evaluate(() => {
+        document.getElementById("playwright-clipboard-check")?.remove();
+      });
+      expect(clipboard).toContain(DEMO_PREFIX);
     }
   });
 });
+
