@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { ThemeToggle } from "../components/shared/ThemeToggle";
 import { Button } from "../components/ui/button";
 import { useWeb3 } from "../hooks/useWeb3";
+import { useDashboardCache } from "../hooks/useDashboardCache";
 import {
   Megaphone,
   Users,
@@ -12,6 +13,7 @@ import {
   CheckCircle2,
   Wallet,
   Activity,
+  Trophy,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -22,6 +24,7 @@ interface DashboardProps {
 export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   const {
     userAddress,
+    userRole,
     updateUserRole,
     isConnected,
     disconnectWallet,
@@ -29,14 +32,36 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
     xlmBalance,
     connectorType,
   } = useWeb3();
+  const { metrics, hydrated, persistMetrics, invalidateCache } = useDashboardCache();
   const [expandedRole, setExpandedRole] = useState<string | null>(null);
   const [hoveredRole, setHoveredRole] = useState<string | null>(null);
   const [isSigning, setIsSigning] = useState(false);
+
+  // Reconcile cached metrics with live network data (background sync, zero layout shift)
+  useEffect(() => {
+    if (!hydrated) return;
+    const liveMetrics = {
+      ...(userRole ? { userRole } : {}),
+      xlmBalance,
+      network,
+      isConnected,
+      connectorType,
+    };
+    persistMetrics(liveMetrics);
+  }, [hydrated, isConnected, network, xlmBalance, connectorType, userRole, persistMetrics]);
+
+  // Invalidate cache on wallet disconnect
+  useEffect(() => {
+    if (!isConnected) {
+      invalidateCache();
+    }
+  }, [isConnected, invalidateCache]);
 
   const handleConfirmRole = async (roleId: string) => {
     setIsSigning(true);
     try {
       await updateUserRole(roleId.toUpperCase());
+      await persistMetrics({ userRole: roleId.toUpperCase(), isConnected: true });
       onNavigate(roleId);
     } catch (error) {
       console.error("Failed to assume role:", error);
@@ -159,7 +184,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                   {connectorType || "Stellar"}
                 </span>
                 <span className="hidden sm:inline-block text-[10px] font-bold px-1.5 py-0.5 bg-slate-200 dark:bg-zinc-700 text-zinc-800 dark:text-zinc-200 rounded">
-                  {xlmBalance} XLM
+                  {metrics.xlmBalance} XLM
                 </span>
               </div>
             )}
@@ -180,14 +205,24 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
 
       <div className="container mx-auto px-4 pt-8 sm:pt-16">
         {/* Title */}
-        <div className="mb-8 sm:mb-12">
-          <h1 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tighter mb-2 sm:mb-4 text-zinc-900 dark:text-white">
-            Select Your Role
-          </h1>
-          <p className="text-sm sm:text-lg text-zinc-500 dark:text-zinc-400 font-medium max-w-xl">
-            Choose your primary persona to interact with the protocol. This will configure your
-            dashboard and smart contract permissions.
-          </p>
+        <div className="mb-8 sm:mb-12 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tighter mb-2 sm:mb-4 text-zinc-900 dark:text-white">
+              Select Your Role
+            </h1>
+            <p className="text-sm sm:text-lg text-zinc-500 dark:text-zinc-400 font-medium max-w-xl">
+              Choose your primary persona to interact with the protocol. This will configure your
+              dashboard and smart contract permissions.
+            </p>
+          </div>
+          <Button
+            onClick={() => onNavigate("leaderboard")}
+            variant="outline"
+            className="self-start sm:self-auto rounded-2xl border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 dark:text-amber-300 font-extrabold h-12 px-5 shadow-sm text-xs sm:text-sm flex items-center gap-2 shrink-0"
+          >
+            <Trophy className="w-4 h-4 text-amber-500" />
+            <span>Affiliate Leaderboard & Badges</span>
+          </Button>
         </div>
 
         {/* Role Cards Grid */}
