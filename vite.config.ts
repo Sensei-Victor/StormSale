@@ -3,10 +3,32 @@ import { defineConfig, configDefaults } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { visualizer } from "rollup-plugin-visualizer";
+import { subresourceIntegrity } from "./src/lib/vite/subresource-integrity-plugin.js";
+
+// Re-export SRI helpers for callers and tests.
+export {
+  computeIntegrity,
+  subresourceIntegrity,
+  KNOWN_EXTERNAL_INTEGRITY,
+} from "./src/lib/vite/subresource-integrity-plugin.js";
+
+export type {
+  SubresourceIntegrityOptions,
+} from "./src/lib/vite/subresource-integrity-plugin.js";
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), tailwindcss(), visualizer({ open: false, gzipSize: true, brotliSize: true })],
+  plugins: [
+    react(),
+    tailwindcss(),
+    subresourceIntegrity(),
+    visualizer({
+      open: false,
+      gzipSize: true,
+      brotliSize: true,
+    }),
+  ],
+
   resolve: {
     dedupe: ["react", "react-dom"],
     preserveSymlinks: true,
@@ -41,13 +63,16 @@ export default defineConfig({
 
   test: {
     globals: true,
+
     // Keep Playwright E2E tests out of Vitest.
     exclude: [...configDefaults.exclude, "e2e/**"],
+
     testTimeout: 20000,
     hookTimeout: 20000,
+
     coverage: {
       provider: "v8",
-      reporter: ["text", "json-summary", "json", "html"],
+      reporter: ["text", "json-summary", "json", "html", "lcov"],
       reportsDirectory: "./coverage",
       include: ["src/**/*.{ts,tsx}"],
       exclude: [
