@@ -1,4 +1,5 @@
-import { useState } from "react";
+import React, { useState, useContext } from "react";
+import { StrKey } from "@stellar/stellar-sdk";
 import { Button } from "../../components/ui/button";
 import {
   Card,
@@ -8,21 +9,44 @@ import {
   CardTitle,
 } from "../../components/ui/card";
 import { useWeb3 } from "../../hooks/useWeb3";
+import { NotificationContext } from "../../context/NotificationContext";
 import { Link2, Copy, Check } from "lucide-react";
 
-export const ReferralLinkCard = () => {
-  const { userAddress } = useWeb3();
+/**
+ * Renders an affiliate's personal referral link card with copy-to-clipboard functionality.
+ * Validates the user's connected wallet address with StrKey before enabling link generation.
+ */
+export const ReferralLinkCard: React.FC = () => {
+  const { isConnected, userAddress } = useWeb3();
+  const notification = useContext(NotificationContext);
   const [copied, setCopied] = useState(false);
 
-  const referralLink = `${window.location.origin}/c/1?ref=${userAddress ?? ""}`;
+  const isValidAddress = Boolean(
+    isConnected && userAddress && StrKey.isValidEd25519PublicKey(userAddress),
+  );
 
+  const referralLink = isValidAddress
+    ? `${window.location.origin}/c/1?ref=${userAddress}`
+    : "";
+
+  /**
+   * Copies the generated referral link to the user's clipboard and triggers visual feedback.
+   * Dispatches an error toast notification if clipboard writing fails.
+   */
   const handleCopy = async () => {
+    if (!isValidAddress || !referralLink) return;
+
     try {
       await navigator.clipboard.writeText(referralLink);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (error) {
       console.error("Failed to copy referral link:", error);
+      notification?.showNotification({
+        type: "error",
+        title: "Copy Failed",
+        message: "Failed to copy referral link to clipboard.",
+      });
     }
   };
 
@@ -44,20 +68,28 @@ export const ReferralLinkCard = () => {
         </div>
       </CardHeader>
       <CardContent className="pt-6">
-        <div className="flex flex-col sm:flex-row gap-3">
-          <code
-            data-testid="referral-link"
-            className="flex-1 min-w-0 truncate px-4 py-3 rounded-xl bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 text-xs font-mono text-zinc-700 dark:text-zinc-300"
-          >
-            {referralLink}
-          </code>
-          <Button
-            onClick={handleCopy}
-            className="h-11 rounded-xl bg-zinc-900 hover:bg-zinc-800 dark:bg-indigo-600 dark:hover:bg-indigo-500 text-white font-semibold shrink-0"
-          >
-            {copied ? <Check className="w-4 h-4 mr-2" /> : <Copy className="w-4 h-4 mr-2" />}
-            {copied ? "Copied" : "Copy Link"}
-          </Button>
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-col sm:flex-row gap-3">
+            <code
+              data-testid="referral-link"
+              className="flex-1 min-w-0 truncate px-4 py-3 rounded-xl bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 text-xs font-mono text-zinc-700 dark:text-zinc-300"
+            >
+              {referralLink}
+            </code>
+            <Button
+              onClick={handleCopy}
+              disabled={!isValidAddress}
+              className="h-11 rounded-xl bg-zinc-900 hover:bg-zinc-800 dark:bg-indigo-600 dark:hover:bg-indigo-500 text-white font-semibold shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {copied ? <Check className="w-4 h-4 mr-2" /> : <Copy className="w-4 h-4 mr-2" />}
+              {copied ? "Copied" : "Copy Link"}
+            </Button>
+          </div>
+          {!isValidAddress && (
+            <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">
+              Connect a wallet with a valid Stellar address
+            </p>
+          )}
         </div>
       </CardContent>
     </Card>
