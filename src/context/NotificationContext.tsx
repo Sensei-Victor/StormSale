@@ -395,9 +395,16 @@ const ToastItem: React.FC<ToastItemProps> = ({
   const actionUrl =
     notification.actionUrl || notification.action?.url;
 
+  /**
+   * Invokes configured action callbacks and dismisses the notification.
+   * Prevents invoking duplicate handlers when `onAction` and `action.onClick` refer to the same function.
+   */
   const handleAction = () => {
-    notification.onAction?.();
-    notification.action?.onClick?.();
+    const { onAction, action } = notification;
+    onAction?.();
+    if (action?.onClick && action.onClick !== onAction) {
+      action.onClick();
+    }
     onDismiss(notification.id);
   };
 
