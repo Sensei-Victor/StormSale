@@ -4,13 +4,13 @@ import { render, screen, fireEvent, act, cleanup } from "@testing-library/react"
 import { ReferralLinkCard } from "../components/affiliate/ReferralLinkCard";
 import { NotificationProvider } from "../context/NotificationContext";
 
-const VALID_KEY = "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5";
-const INVALID_KEY = "NOT-A-VALID-ADDRESS";
+const VALID_ADDRESS = "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5";
+const INVALID_ADDRESS = "NOT-A-VALID-ADDRESS";
 
 const mockWeb3State = {
   current: {
     isConnected: true,
-    userAddress: VALID_KEY,
+    userAddress: VALID_ADDRESS,
   },
 };
 
@@ -37,7 +37,7 @@ describe("ReferralLinkCard Component (#216)", () => {
     cleanup();
     mockWeb3State.current = {
       isConnected: true,
-      userAddress: VALID_KEY,
+      userAddress: VALID_ADDRESS,
     };
   });
 
@@ -53,7 +53,7 @@ describe("ReferralLinkCard Component (#216)", () => {
     renderCard();
     expect(screen.getByText("Your Referral Link")).toBeTruthy();
     const linkEl = screen.getByTestId("referral-link");
-    expect(linkEl.textContent).toBe(`${window.location.origin}/c/1?ref=${VALID_KEY}`);
+    expect(linkEl.textContent).toBe(`${window.location.origin}/c/1?ref=${VALID_ADDRESS}`);
     const copyButton = screen.getByRole("button", { name: /copy link/i });
     expect((copyButton as HTMLButtonElement).disabled).toBe(false);
   });
@@ -72,7 +72,7 @@ describe("ReferralLinkCard Component (#216)", () => {
       fireEvent.click(copyButton);
     });
 
-    expect(writeTextMock).toHaveBeenCalledWith(`${window.location.origin}/c/1?ref=${VALID_KEY}`);
+    expect(writeTextMock).toHaveBeenCalledWith(`${window.location.origin}/c/1?ref=${VALID_ADDRESS}`);
     expect(screen.getByRole("button", { name: /copied/i })).toBeTruthy();
   });
 
@@ -101,7 +101,7 @@ describe("ReferralLinkCard Component (#216)", () => {
   it("disables copy button and empties link when address is invalid", () => {
     mockWeb3State.current = {
       isConnected: true,
-      userAddress: INVALID_KEY,
+      userAddress: INVALID_ADDRESS,
     };
 
     renderCard();
