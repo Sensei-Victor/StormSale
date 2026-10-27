@@ -179,6 +179,32 @@ export async function signAlbedoTransaction(
 }
 
 /**
+ * Safely extracts an error message from an unknown error or returns the fallback message.
+ *
+ * @param err - Unknown error caught in a try/catch block
+ * @param fallback - Default message to return if err does not have a message
+ * @returns Error message string
+ */
+function getErrorMessage(err: unknown, fallback: string): string {
+  if (err instanceof Error && err.message) {
+    return err.message;
+  }
+  if (
+    typeof err === "object" &&
+    err !== null &&
+    "message" in err &&
+    typeof (err as { message: unknown }).message === "string" &&
+    (err as { message: string }).message.length > 0
+  ) {
+    return (err as { message: string }).message;
+  }
+  if (typeof err === "string" && err.length > 0) {
+    return err;
+  }
+  return fallback;
+}
+
+/**
  * Connects to xBull wallet (extension / web).
  */
 export async function connectXbullWallet(): Promise<string> {
@@ -191,8 +217,8 @@ export async function connectXbullWallet(): Promise<string> {
   try {
     const address = await xbull.getPublicKey();
     return address;
-  } catch (err: any) {
-    throw new Error(err.message || "xBull connection failed.", { cause: err });
+  } catch (err: unknown) {
+    throw new Error(getErrorMessage(err, "xBull connection failed."), { cause: err });
   }
 }
 
@@ -928,9 +954,9 @@ export async function invokeSorobanMethod(
     }
 
     preparedTx = rpc.assembleTransaction(preliminaryTx, simResponse).build();
-  } catch (err: any) {
+  } catch (err: unknown) {
     throw new Error(
-      `Soroban invocation preparation failed for ${callerAddress}: ${err?.message || err}. ` +
+      `Soroban invocation preparation failed for ${callerAddress}: ${getErrorMessage(err, String(err))}. ` +
         `If the account is not funded on Testnet, use Friendbot to fund it first.`,
       { cause: err },
     );
@@ -1385,7 +1411,7 @@ export async function mintMilestoneBadgeContractCall(
 
   // Real wallet transactions must succeed on-chain.
   // Errors are allowed to propagate; never fabricate a successful transaction hash.
-  const result = await invokeSorobanMethod(
+  const result = await stellarOperations.invokeSorobanMethod(
     affiliateAddress,
     "mint_milestone_badge",
     args,
